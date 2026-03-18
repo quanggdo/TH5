@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -13,8 +14,15 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
+  final FocusNode _emailFocus = FocusNode();
+  final FocusNode _passwordFocus = FocusNode();
+  final FocusNode _confirmFocus = FocusNode();
   bool _obscure = true;
   bool _isLoading = false;
+  String? _emailError;
+  String? _passwordError;
+  String? _confirmError;
+  String? _authError;
 
   Future<void> _register() async {
     final auth = context.read<AuthService>();
@@ -22,24 +30,44 @@ class _SignupScreenState extends State<SignupScreen> {
     final password = _passwordController.text.trim();
     final confirm = _confirmController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập email và mật khẩu')),
-      );
-      return;
-    }
+    // Clear previous auth error
+    setState(() => _authError = null);
 
+    bool hasError = false;
+    if (email.isEmpty) {
+      _emailError = 'Vui lòng điền email';
+      hasError = true;
+    } else {
+      // basic email format check
+      final emailRegex = RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}");
+      if (!emailRegex.hasMatch(email)) {
+        _emailError = 'Email không hợp lệ';
+        hasError = true;
+      } else {
+        _emailError = null;
+      }
+    }
+    if (password.isEmpty) {
+      _passwordError = 'Vui lòng nhập mật khẩu';
+      hasError = true;
+    } else if (password.length < 6) {
+      _passwordError = 'Mật khẩu phải ít nhất 6 ký tự';
+      hasError = true;
+    } else {
+      _passwordError = null;
+    }
     if (confirm.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng xác nhận mật khẩu')),
-      );
-      return;
+      _confirmError = 'Vui lòng xác nhận mật khẩu';
+      hasError = true;
+    } else {
+      _confirmError = null;
     }
-
-    if (password != confirm) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mật khẩu xác nhận không khớp')),
-      );
+    if (password.isNotEmpty && confirm.isNotEmpty && password != confirm) {
+      _confirmError = 'Xác nhận mật khẩu không chính xác';
+      hasError = true;
+    }
+    if (hasError) {
+      setState(() {});
       return;
     }
 
@@ -54,12 +82,66 @@ class _SignupScreenState extends State<SignupScreen> {
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi đăng ký: $e')),
-      );
+      if (e is FirebaseAuthException && e.code == 'email-already-in-use') {
+        setState(() {
+          _authError = 'Tài khoản đã tồn tại';
+          _emailError = null;
+        });
+      } else {
+        setState(() {
+          _authError = 'Lỗi đăng ký: ${e.toString()}';
+        });
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _emailFocus.addListener(() {
+      if (_emailFocus.hasFocus) {
+        setState(() {
+          _emailError = null;
+          _authError = null;
+        });
+        _emailController.clear();
+      }
+    });
+    _passwordFocus.addListener(() {
+      if (_passwordFocus.hasFocus) {
+        setState(() {
+          _passwordError = null;
+          _authError = null;
+        });
+        if (_passwordError != null || _authError != null) {
+          _passwordController.clear();
+        }
+      }
+    });
+    _confirmFocus.addListener(() {
+      if (_confirmFocus.hasFocus) {
+        setState(() {
+          _confirmError = null;
+          _authError = null;
+        });
+        if (_confirmError != null || _authError != null) {
+          _confirmController.clear();
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    _confirmFocus.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
   }
 
   @override
@@ -92,24 +174,53 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 28),
 
+              if (_authError != null) ...[
+                Text(
+                  _authError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+              ],
+
               TextField(
+                focusNode: _emailFocus,
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   hintText: 'Email',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   border: OutlineInputBorder(borderRadius: borderRadius),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: borderRadius,
+                    borderSide: BorderSide(
+                      color: (_emailError != null || _authError != null)
+                          ? Colors.red
+                          : Colors.cyan.shade300,
+                      width: 2,
+                    ),
+                  ),
+                  errorText: _emailError,
                 ),
               ),
 
               const SizedBox(height: 16),
               TextField(
+                focusNode: _passwordFocus,
                 controller: _passwordController,
                 obscureText: _obscure,
                 decoration: InputDecoration(
                   hintText: 'Mật khẩu',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   border: OutlineInputBorder(borderRadius: borderRadius),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: borderRadius,
+                    borderSide: BorderSide(
+                      color: (_passwordError != null) ? Colors.red : Colors.grey.shade400,
+                      width: 1.2,
+                    ),
+                  ),
+                  errorText: _passwordError,
                   suffixIcon: IconButton(
                     icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(() => _obscure = !_obscure),
@@ -119,14 +230,29 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const SizedBox(height: 12),
               TextField(
+                focusNode: _confirmFocus,
                 controller: _confirmController,
                 obscureText: _obscure,
                 decoration: InputDecoration(
                   hintText: 'Xác nhận mật khẩu',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   border: OutlineInputBorder(borderRadius: borderRadius),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: borderRadius,
+                    borderSide: BorderSide(
+                      color: (_confirmError != null) ? Colors.red : Colors.grey.shade400,
+                      width: 1.2,
+                    ),
+                  ),
                 ),
               ),
+              if (_confirmError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _confirmError!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ],
 
               const SizedBox(height: 24),
               SizedBox(
