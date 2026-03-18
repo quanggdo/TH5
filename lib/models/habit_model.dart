@@ -1,21 +1,22 @@
-
 enum HabitType { weekly, interval }
 
 class Habit {
   String id;
+  String? userId; // Added userId
   String title;
   String detail;
   HabitType type;
-  List<int>? weeklyDays; // [1..7] — Monday=1, Sunday=7
-  int? intervalDays; // Số ngày cách quãng
-  DateTime startDate; // Ngày bắt đầu để tính chu kỳ
-  int timesPerDay; // Số lần thực hiện trong ngày
-  DateTime? lastCompleted; // Lần gần nhất hoàn thành (local)
-  String category; // Nhãn phân loại (Sức khỏe, Học tập,...)
-  bool isDeleted; // Soft-delete: giữ lại dữ liệu quá khứ
+  List<int>? weeklyDays;
+  int? intervalDays;
+  DateTime startDate;
+  int timesPerDay;
+  DateTime? lastCompleted;
+  String category;
+  bool isDeleted;
 
   Habit({
     required this.id,
+    this.userId,
     required this.title,
     required this.detail,
     required this.type,
@@ -30,6 +31,7 @@ class Habit {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'userId': userId,
         'title': title,
         'detail': detail,
         'type': type.name,
@@ -44,6 +46,7 @@ class Habit {
 
   factory Habit.fromJson(Map<String, dynamic> json) => Habit(
         id: json['id'] as String,
+        userId: json['userId'] as String?,
         title: json['title'] as String,
         detail: json['detail'] as String,
         type: HabitType.values.byName(json['type'] as String),

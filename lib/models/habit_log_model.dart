@@ -37,7 +37,7 @@ class HabitLog {
     );
   }
 
-  /// Dùng để lưu pending logs vào SharedPreferences khi offline
+  /// Dùng để serialize/deserialize dạng JSON thuần (local cache)
   Map<String, dynamic> toJson() => {
         'habitId': habitId,
         'userId': userId,

@@ -1,37 +1,44 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/habit_log_model.dart';
+import '../models/habit_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   CollectionReference get _logsCollection => _db.collection('habit_logs');
+  CollectionReference get _habitsCollection => _db.collection('habits');
 
-  // ─── Single Log ───────────────────────────────────────────
+  // ─── Habits ───────────────────────────────────────────────
+
+  /// Đẩy hoặc cập nhật Habit lên Firestore
+  Future<void> syncHabit(Habit habit) async {
+    if (habit.userId == null) return;
+    await _habitsCollection.doc(habit.id).set(
+          habit.toJson(),
+          SetOptions(merge: true),
+        );
+  }
+
+  /// Lấy danh sách Habit từ Firestore
+  Future<List<Habit>> getHabits(String userId) async {
+    final snapshot = await _habitsCollection
+        .where('userId', isEqualTo: userId)
+        .where('isDeleted', isEqualTo: false)
+        .get();
+    return snapshot.docs
+        .map((doc) => Habit.fromJson(doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ─── Logs ───────────────────────────────────────────
 
   /// Đẩy hoặc cập nhật 1 log lên Firestore
   Future<void> syncLog(HabitLog log) async {
-    // Dùng composite key để tránh trùng lặp
     final docId = '${log.userId}_${log.habitId}_${log.date}';
     await _logsCollection.doc(docId).set(
           log.toFirestore(),
           SetOptions(merge: true),
         );
-  }
-
-  // ─── Batch Sync (Offline → Online) ────────────────────────
-
-  /// Đẩy một loạt pending logs lên Firestore bằng batch write
-  Future<void> syncPendingLogs(List<HabitLog> pendingLogs) async {
-    final batch = _db.batch();
-    for (final log in pendingLogs) {
-      final docId = '${log.userId}_${log.habitId}_${log.date}';
-      batch.set(
-        _logsCollection.doc(docId),
-        log.toFirestore(),
-        SetOptions(merge: true),
-      );
-    }
-    await batch.commit();
   }
 
   // ─── Query theo Ngày ──────────────────────────────────────
@@ -49,7 +56,6 @@ class FirestoreService {
 
   // ─── Query theo khoảng ngày (core) ─────────────────────────
 
-  /// Query logs theo khoảng ngày bất kỳ — dùng chung cho Tuần/Tháng
   Future<List<HabitLog>> getLogsByDateRange(
       String userId, DateTime startDate, DateTime endDate) async {
     final start = DateTime(startDate.year, startDate.month, startDate.day);
@@ -69,7 +75,6 @@ class FirestoreService {
 
   // ─── Query theo Tuần ──────────────────────────────────────
 
-  /// Lấy logs cho 1 tuần (từ startOfWeek đến startOfWeek + 6 ngày)
   Future<List<HabitLog>> getLogsForWeek(
       String userId, DateTime startOfWeek) async {
     final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
@@ -79,11 +84,10 @@ class FirestoreService {
 
   // ─── Query theo Tháng ─────────────────────────────────────
 
-  /// Lấy logs cho 1 tháng
   Future<List<HabitLog>> getLogsForMonth(
       String userId, DateTime month) async {
     final start = DateTime(month.year, month.month, 1);
-    final end = DateTime(month.year, month.month + 1, 0); // ngày cuối tháng
+    final end = DateTime(month.year, month.month + 1, 0);
     return getLogsByDateRange(userId, start, end);
   }
 }
