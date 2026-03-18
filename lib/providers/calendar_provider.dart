@@ -43,8 +43,8 @@ class CalendarProvider extends ChangeNotifier {
 
     _filterHabitsForDate();
 
-    if (userChanged) {
-      Future.microtask(() {
+    Future.microtask(() {
+      if (userChanged) {
         if (_userId != null) {
           if (_currentView == CalendarView.day) {
             _loadCompletionStatus();
@@ -56,8 +56,11 @@ class CalendarProvider extends ChangeNotifier {
           _periodLogs.clear();
           notifyListeners();
         }
-      });
-    }
+      } else {
+        // Cập nhật lại UI khi list Habits có thay đổi từ nhánh `HabitProvider`
+        notifyListeners(); 
+      }
+    });
   }
 
   // ─── Actions ──────────────────────────────────────────────
