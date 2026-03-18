@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/habit_model.dart';
 import '../providers/habit_provider.dart';
 import '../providers/calendar_provider.dart';
-import '../services/auth_service.dart';
+import 'habit_management_screen.dart';
 import '../widgets/habit_card.dart';
 import '../widgets/view_mode_selector.dart';
 import '../widgets/habit_filter.dart';
@@ -91,10 +91,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            // TODO: Mở màn hình danh sách thói quen
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Mở danh sách thói quen'),
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const HabitManagementScreen(),
                               ),
                             );
                           },
