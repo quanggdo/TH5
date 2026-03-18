@@ -30,6 +30,12 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await auth.signInWithEmail(email, password);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đăng nhập thành công')),
+        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi đăng nhập: $e')),
@@ -112,14 +118,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text('Đăng nhập', style: TextStyle(fontSize: 16, color: Colors.white)),
                 ),
-              ),
-
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () {
-                  // TODO: implement forgot password flow
-                },
-                child: const Text('Quên mật khẩu?', style: TextStyle(color: Colors.black54)),
               ),
 
               const SizedBox(height: 12),
