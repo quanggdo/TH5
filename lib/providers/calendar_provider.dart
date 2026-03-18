@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/habit_model.dart';
 import '../models/habit_log_model.dart';
 import '../services/firestore_service.dart';
@@ -141,10 +142,16 @@ class CalendarProvider extends ChangeNotifier {
 
   // ─── Toggle hoàn thành ────────────────────────────────────
 
-  Future<void> toggleCompletion(String habitId, DateTime date, int timesPerDay) async {
-    if (_userId == null) return;
+  Future<int> toggleCompletion(
+    String habitId,
+    DateTime date,
+    int timesPerDay,
+  ) async {
+    final uid = _userId ?? FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return _completionCount[habitId] ?? 0;
 
-    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     final currentCount = _completionCount[habitId] ?? 0;
     final newCount = currentCount >= timesPerDay ? 0 : currentCount + 1;
     final isCompleted = newCount >= timesPerDay;
@@ -155,7 +162,7 @@ class CalendarProvider extends ChangeNotifier {
 
     final log = HabitLog(
       habitId: habitId,
-      userId: _userId!,
+      userId: uid,
       date: dateStr,
       isCompleted: isCompleted,
       count: newCount,
@@ -166,5 +173,7 @@ class CalendarProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Log saved locally. Firestore will sync when online. Error: $e');
     }
+
+    return newCount;
   }
 }

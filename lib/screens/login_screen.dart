@@ -105,77 +105,66 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(30.0);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Đăng nhập'),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 8),
               Text(
-                'Habit Tracker',
+                'Theo dõi thói quen',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.blue.shade900,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 8),
+              Text(
+                'Đăng nhập để tiếp tục hành trình',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 20),
 
               if (_authError != null) ...[
                 Text(
                   _authError!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                  style: TextStyle(color: colorScheme.error, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
               ],
 
-              // Email
               TextField(
                 focusNode: _emailFocus,
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  hintText: 'Email',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                  border: OutlineInputBorder(borderRadius: borderRadius),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: borderRadius,
-                    borderSide: BorderSide(
-                      color: (_emailError != null || _authError != null)
-                          ? Colors.red
-                          : Colors.cyan.shade300,
-                      width: 2,
-                    ),
-                  ),
+                  labelText: 'Email',
+                  hintText: 'example@email.com',
+                  prefixIcon: const Icon(Icons.email_outlined),
                   errorText: _emailError,
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Password
               TextField(
                 focusNode: _passwordFocus,
                 controller: _passwordController,
                 obscureText: _obscure,
                 decoration: InputDecoration(
-                  hintText: 'Mật khẩu',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                  border: OutlineInputBorder(borderRadius: borderRadius),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: borderRadius,
-                    borderSide: BorderSide(
-                      color: (_passwordError != null || _authError != null)
-                          ? Colors.red
-                          : Colors.grey.shade400,
-                      width: 1.2,
-                    ),
-                  ),
+                  labelText: 'Mật khẩu',
+                  prefixIcon: const Icon(Icons.lock_outline),
                   errorText: _passwordError,
                   suffixIcon: IconButton(
                     icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
@@ -188,24 +177,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
               SizedBox(
                 height: 48,
-                child: ElevatedButton(
+                child: FilledButton(
                   onPressed: _isLoading ? null : _signIn,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.lightBlueAccent,
-                    shape: const StadiumBorder(),
-                    elevation: 4,
-                  ),
-                    child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Đăng nhập', style: TextStyle(fontSize: 16, color: Colors.white)),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Đăng nhập'),
                 ),
               ),
-
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đăng nhập Google chưa được cấu hình'),
+                            ),
+                          );
+                        },
+                  icon: const Icon(Icons.g_mobiledata),
+                  label: const Text('Đăng nhập bằng Google'),
+                ),
+              ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Chưa có tài khoản? ', style: TextStyle(color: Colors.black54)),
+                  Text(
+                    'Chưa có tài khoản? ',
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
                   TextButton(
                     onPressed: () => Navigator.of(context).pushNamed('/signup'),
                     child: const Text('Đăng ký ngay'),

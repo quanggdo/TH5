@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/habit_model.dart';
 import '../providers/calendar_provider.dart';
 import '../providers/habit_provider.dart';
+import 'habit_form_screen.dart';
 
 class HabitManagementScreen extends StatefulWidget {
   const HabitManagementScreen({super.key});
@@ -50,7 +51,21 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
     final today = _dateOnly(DateTime.now());
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Danh sach thoi quen con thuc hien')),
+      appBar: AppBar(
+        title: const Text('Thói quen đang thực hiện'),
+        actions: [
+          IconButton(
+            tooltip: 'Thêm thói quen',
+            icon: const Icon(Icons.add),
+            onPressed: () => _openCreate(context),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openCreate(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Thêm thói quen'),
+      ),
       body: Consumer2<HabitProvider, CalendarProvider>(
         builder: (context, habitProvider, calendarProvider, _) {
           final items = habitProvider.activeHabits.map((habit) {
@@ -79,8 +94,27 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
               .length;
 
           if (items.isEmpty) {
-            return const Center(
-              child: Text('Chua co thoi quen nao dang thuc hien'),
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome, size: 56),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Chưa có thói quen nào đang thực hiện',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () => _openCreate(context),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Tạo thói quen mới'),
+                    ),
+                  ],
+                ),
+              ),
             );
           }
 
@@ -103,42 +137,113 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
                   final badgeColor = _badgeColor(item.badgeType);
 
                   return ListTile(
-                    title: Text(habit.title),
+                    title: Text(
+                      habit.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_subtitleForHabit(habit)),
+                        Text(
+                          _subtitleForHabit(habit),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(height: 4),
                         Text(
-                          'Tien do hom nay: ${item.progressToday}/${habit.timesPerDay}',
+                          'Tiến độ hôm nay: ${item.progressToday}/${habit.timesPerDay}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         if (item.badgeType == _DueBadgeType.tomorrow &&
                             item.nextDueDate != null)
                           Text(
-                            'Lan tiep theo: ${_formatDate(item.nextDueDate!)}',
+                            'Lần tiếp theo: ${_formatDate(item.nextDueDate!)}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                       ],
                     ),
-                    trailing: badgeText == null
-                        ? null
-                        : Chip(
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (badgeText != null)
+                          Chip(
                             label: Text(badgeText),
                             backgroundColor: badgeColor,
                             visualDensity: VisualDensity.compact,
                           ),
+                        PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _openEdit(context, habit);
+                            } else if (value == 'delete') {
+                              _confirmDelete(context, habit);
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Sửa'),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Xóa'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                     isThreeLine: true,
                   );
                 },
                 separatorBuilder: (_, _) => const Divider(height: 1),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              const SliverToBoxAdapter(child: SizedBox(height: 84)),
             ],
           );
         },
       ),
     );
+  }
+
+  void _openCreate(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const HabitFormScreen(),
+      ),
+    );
+  }
+
+  void _openEdit(BuildContext context, Habit habit) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HabitFormScreen(existingHabit: habit),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, Habit habit) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa thói quen'),
+        content: Text('Bạn có chắc muốn xóa "${habit.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true && context.mounted) {
+      await context.read<HabitProvider>().deleteHabit(habit.id);
+    }
   }
 
   void _sortByTodayPriority(List<_HabitListItemData> items) {
@@ -254,13 +359,13 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
   String? _badgeLabel(_DueBadgeType badgeType) {
     switch (badgeType) {
       case _DueBadgeType.overdue:
-        return 'Qua han';
+        return 'Quá hạn';
       case _DueBadgeType.today:
-        return 'Hom nay';
+        return 'Hôm nay';
       case _DueBadgeType.tomorrow:
-        return 'Ngay mai';
+        return 'Ngày mai';
       case _DueBadgeType.upcoming:
-        return 'Sap toi';
+        return 'Sắp tới';
       case _DueBadgeType.none:
         return null;
     }
@@ -293,14 +398,14 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
 
   String _subtitleForHabit(Habit habit) {
     final typeText = habit.type == HabitType.weekly
-        ? 'Hang tuan'
-        : 'Cach ${habit.intervalDays ?? 1} ngay';
+        ? 'Hằng tuần'
+        : 'Cách ${habit.intervalDays ?? 1} ngày';
 
     final category = habit.category.trim().isEmpty
-        ? 'Khong co nhom'
+        ? 'Không có nhóm'
         : habit.category.trim();
 
-    return '$typeText • $category • ${habit.timesPerDay} lan/ngay';
+    return '$typeText • $category • ${habit.timesPerDay} lần/ngày';
   }
 }
 
@@ -332,10 +437,10 @@ class _SummaryHeaderDelegate extends SliverPersistentHeaderDelegate {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _SummaryMetric(label: 'Con thuc hien', value: '$totalActive'),
-              _SummaryMetric(label: 'Den han hom nay', value: '$dueToday'),
+              _SummaryMetric(label: 'Còn thực hiện', value: '$totalActive'),
+              _SummaryMetric(label: 'Đến hạn hôm nay', value: '$dueToday'),
               _SummaryMetric(
-                label: 'Da xong hom nay',
+                label: 'Đã xong hôm nay',
                 value: '$completedToday',
               ),
             ],

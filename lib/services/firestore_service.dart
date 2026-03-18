@@ -6,14 +6,16 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   CollectionReference get _logsCollection => _db.collection('habit_logs');
-  CollectionReference get _habitsCollection => _db.collection('habits');
+  CollectionReference _habitsCollectionForUser(String userId) =>
+      _db.collection('users').doc(userId).collection('habits');
 
   // ─── Habits ───────────────────────────────────────────────
 
   /// Đẩy hoặc cập nhật Habit lên Firestore
   Future<void> syncHabit(Habit habit) async {
-    if (habit.userId == null) return;
-    await _habitsCollection.doc(habit.id).set(
+    final userId = habit.userId;
+    if (userId == null || userId.trim().isEmpty) return;
+    await _habitsCollectionForUser(userId).doc(habit.id).set(
           habit.toJson(),
           SetOptions(merge: true),
         );
@@ -21,8 +23,7 @@ class FirestoreService {
 
   /// Lấy danh sách Habit từ Firestore
   Future<List<Habit>> getHabits(String userId) async {
-    final snapshot = await _habitsCollection
-        .where('userId', isEqualTo: userId)
+    final snapshot = await _habitsCollectionForUser(userId)
         .where('isDeleted', isEqualTo: false)
         .get();
     return snapshot.docs

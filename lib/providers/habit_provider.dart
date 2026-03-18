@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/habit_model.dart';
 import '../services/local_storage_service.dart';
 import '../services/firestore_service.dart';
@@ -33,23 +34,31 @@ class HabitProvider extends ChangeNotifier {
     }
   }
 
+  String? _effectiveUserId() {
+    return _userId ?? FirebaseAuth.instance.currentUser?.uid;
+  }
+
   // ─── Load ─────────────────────────────────────────────────
 
   Future<void> _syncAndLoadHabits() async {
-    if (_userId == null) return;
+    final uid = _effectiveUserId();
+    if (uid == null) return;
     _isLoading = true;
     notifyListeners();
 
     try {
-      final onlineHabits = await _firestoreService.getHabits(_userId!);
+      final onlineHabits = await _firestoreService.getHabits(uid);
       if (onlineHabits.isNotEmpty) {
         _activeHabits = onlineHabits;
-        await _localStorageService.saveHabits(_activeHabits);
+        await _localStorageService.saveHabits(
+          _activeHabits,
+          userId: uid,
+        );
       } else {
-        _activeHabits = await _localStorageService.getHabits();
+        _activeHabits = await _localStorageService.getHabits(userId: uid);
       }
     } catch (e) {
-      _activeHabits = await _localStorageService.getHabits();
+      _activeHabits = await _localStorageService.getHabits(userId: uid);
       debugPrint("Offline mode: Loaded habits from local storage.");
     }
 
@@ -58,62 +67,99 @@ class HabitProvider extends ChangeNotifier {
   }
 
   Future<void> loadHabits() async {
-    _activeHabits = await _localStorageService.getHabits();
+    final uid = _effectiveUserId();
+    _activeHabits = await _localStorageService.getHabits(userId: uid);
     notifyListeners();
   }
 
   // ─── Add ──────────────────────────────────────────────────
 
-  Future<void> addHabit(Habit habit) async {
-    habit.userId = _userId; 
+  Future<bool> addHabit(Habit habit) async {
+    final uid = _effectiveUserId();
+    if (uid == null || uid.trim().isEmpty) {
+      debugPrint('addHabit skipped: userId is null');
+      return false;
+    }
+    habit.userId = uid;
     _activeHabits.add(habit);
-    await _localStorageService.saveHabits(_activeHabits);
-    if (_userId != null) {
+    await _localStorageService.saveHabits(_activeHabits, userId: uid);
+    try {
       await _firestoreService.syncHabit(habit);
+    } catch (e) {
+      debugPrint('Sync habit failed: $e');
     }
     notifyListeners();
+    return true;
   }
 
   // ─── Update ───────────────────────────────────────────────
 
-  Future<void> updateHabit(Habit updatedHabit) async {
+  Future<bool> updateHabit(Habit updatedHabit) async {
+    final uid = _effectiveUserId();
+    if (uid == null || uid.trim().isEmpty) {
+      debugPrint('updateHabit skipped: userId is null');
+      return false;
+    }
     final index = _activeHabits.indexWhere((h) => h.id == updatedHabit.id);
     if (index != -1) {
+      updatedHabit.userId = uid;
       _activeHabits[index] = updatedHabit;
-      await _localStorageService.saveHabits(_activeHabits);
-      if (_userId != null) {
+      await _localStorageService.saveHabits(_activeHabits, userId: uid);
+      try {
         await _firestoreService.syncHabit(updatedHabit);
+      } catch (e) {
+        debugPrint('Sync habit failed: $e');
       }
       notifyListeners();
+      return true;
     }
+    return false;
   }
 
   // ─── Delete ───────────────────────────────────────────────
 
-  Future<void> deleteHabit(String habitId) async {
+  Future<bool> deleteHabit(String habitId) async {
+    final uid = _effectiveUserId();
+    if (uid == null || uid.trim().isEmpty) {
+      debugPrint('deleteHabit skipped: userId is null');
+      return false;
+    }
     final index = _activeHabits.indexWhere((h) => h.id == habitId);
     if (index != -1) {
       _activeHabits[index].isDeleted = true;
-      await _localStorageService.saveHabits(_activeHabits);
-      if (_userId != null) {
+      await _localStorageService.saveHabits(_activeHabits, userId: uid);
+      try {
         await _firestoreService.syncHabit(_activeHabits[index]);
+      } catch (e) {
+        debugPrint('Sync habit failed: $e');
       }
       notifyListeners();
+      return true;
     }
+    return false;
   }
 
   // ─── Mark Completed (Helper) ──────────────────────────────
 
-  Future<void> markCompleted(String habitId) async {
+  Future<bool> markCompleted(String habitId) async {
+    final uid = _effectiveUserId();
+    if (uid == null || uid.trim().isEmpty) {
+      debugPrint('markCompleted skipped: userId is null');
+      return false;
+    }
     final index = _activeHabits.indexWhere((h) => h.id == habitId);
     if (index != -1) {
       _activeHabits[index].lastCompleted = DateTime.now();
-      await _localStorageService.saveHabits(_activeHabits);
-      if (_userId != null) {
+      await _localStorageService.saveHabits(_activeHabits, userId: uid);
+      try {
         await _firestoreService.syncHabit(_activeHabits[index]);
+      } catch (e) {
+        debugPrint('Sync habit failed: $e');
       }
       notifyListeners();
+      return true;
     }
+    return false;
   }
 
   // ─── Helpers ──────────────────────────────────────────────
