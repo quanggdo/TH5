@@ -1,97 +1,137 @@
 import 'package:flutter/foundation.dart';
 import '../models/habit_model.dart';
 import '../services/local_storage_service.dart';
+import '../services/firestore_service.dart';
 
 class HabitProvider extends ChangeNotifier {
   final LocalStorageService _localStorageService;
+  final FirestoreService _firestoreService;
+  String? _userId;
 
-  HabitProvider(this._localStorageService);
+  HabitProvider(this._localStorageService, this._firestoreService);
 
   List<Habit> _activeHabits = [];
-  /// Chỉ trả về habits chưa bị xóa
   List<Habit> get activeHabits =>
       List.unmodifiable(_activeHabits.where((h) => !h.isDeleted));
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  /// Cập nhật UserId và Load dữ liệu mới (được gọi từ ProxyProvider)
+  void updateUser(String? userId) {
+    if (_userId != userId) {
+      _userId = userId;
+      Future.microtask(() {
+        if (userId != null) {
+          _syncAndLoadHabits();
+        } else {
+          // Đăng xuất -> Xóa danh sách tải trên máy
+          _activeHabits.clear();
+          notifyListeners();
+        }
+      });
+    }
+  }
+
   // ─── Load ─────────────────────────────────────────────────
 
-  /// Tải danh sách thói quen từ local storage
-  Future<void> loadHabits() async {
+  Future<void> _syncAndLoadHabits() async {
+    if (_userId == null) return;
     _isLoading = true;
     notifyListeners();
 
-    _activeHabits = await _localStorageService.getHabits();
+    try {
+      final onlineHabits = await _firestoreService.getHabits(_userId!);
+      if (onlineHabits.isNotEmpty) {
+        _activeHabits = onlineHabits;
+        await _localStorageService.saveHabits(_activeHabits);
+      } else {
+        _activeHabits = await _localStorageService.getHabits();
+      }
+    } catch (e) {
+      _activeHabits = await _localStorageService.getHabits();
+      debugPrint("Offline mode: Loaded habits from local storage.");
+    }
 
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadHabits() async {
+    _activeHabits = await _localStorageService.getHabits();
     notifyListeners();
   }
 
   // ─── Add ──────────────────────────────────────────────────
 
   Future<void> addHabit(Habit habit) async {
+    habit.userId = _userId; 
     _activeHabits.add(habit);
     await _localStorageService.saveHabits(_activeHabits);
+    if (_userId != null) {
+      await _firestoreService.syncHabit(habit);
+    }
     notifyListeners();
   }
 
   // ─── Update ───────────────────────────────────────────────
 
   Future<void> updateHabit(Habit updatedHabit) async {
-    final index =
-        _activeHabits.indexWhere((h) => h.id == updatedHabit.id);
+    final index = _activeHabits.indexWhere((h) => h.id == updatedHabit.id);
     if (index != -1) {
       _activeHabits[index] = updatedHabit;
       await _localStorageService.saveHabits(_activeHabits);
+      if (_userId != null) {
+        await _firestoreService.syncHabit(updatedHabit);
+      }
       notifyListeners();
     }
   }
 
-  // ─── Delete (Soft-delete) ─────────────────────────────────
+  // ─── Delete ───────────────────────────────────────────────
 
-  /// Đánh dấu xóa mềm — giữ lại dữ liệu quá khứ trên Firebase
   Future<void> deleteHabit(String habitId) async {
     final index = _activeHabits.indexWhere((h) => h.id == habitId);
     if (index != -1) {
       _activeHabits[index].isDeleted = true;
       await _localStorageService.saveHabits(_activeHabits);
+      if (_userId != null) {
+        await _firestoreService.syncHabit(_activeHabits[index]);
+      }
       notifyListeners();
     }
   }
 
-  // ─── Mark Completed ───────────────────────────────────────
+  // ─── Mark Completed (Helper) ──────────────────────────────
 
-  /// Cập nhật lastCompleted cho thói quen khi người dùng bấm hoàn thành
   Future<void> markCompleted(String habitId) async {
     final index = _activeHabits.indexWhere((h) => h.id == habitId);
     if (index != -1) {
       _activeHabits[index].lastCompleted = DateTime.now();
       await _localStorageService.saveHabits(_activeHabits);
+      if (_userId != null) {
+        await _firestoreService.syncHabit(_activeHabits[index]);
+      }
       notifyListeners();
     }
   }
 
   // ─── Helpers ──────────────────────────────────────────────
 
-  /// Lấy danh sách thói quen cần thực hiện trong ngày [date]
   List<Habit> getHabitsForDate(DateTime date) {
     return _activeHabits.where((h) => !h.isDeleted && h.isDueOn(date)).toList();
   }
 
-  /// Lọc thói quen theo nhãn phân loại (category)
   List<Habit> filterHabits(String category) {
     if (category.isEmpty) return activeHabits;
     return activeHabits.where((h) => h.category == category).toList();
   }
 
-  /// Lấy 1 thói quen theo ID (dùng cho màn hình Sửa)
   Habit? getHabitById(String id) {
     final index = _activeHabits.indexWhere((h) => h.id == id);
     return index != -1 ? _activeHabits[index] : null;
   }
 
-  /// Lấy danh sách category duy nhất (dùng cho UI filter)
   List<String> get categories {
     return _activeHabits
         .where((h) => !h.isDeleted && h.category.isNotEmpty)

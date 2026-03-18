@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
@@ -13,6 +15,9 @@ import 'screens/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  // Bật tính năng Offline Data Persistence cho thiết bị (Firestore Cache)
+  FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
 
   // Khởi tạo Services
   final localStorageService = LocalStorageService();
@@ -23,19 +28,30 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        // Services (inject qua Provider để các widget con có thể truy cập)
+        // Services
         Provider<AuthService>.value(value: authService),
         Provider<ConnectivityService>.value(value: connectivityService),
         Provider<LocalStorageService>.value(value: localStorageService),
         Provider<FirestoreService>.value(value: firestoreService),
-
-        // Providers (inject Services qua constructor — DI pattern)
-        ChangeNotifierProvider<HabitProvider>(
-          create: (_) => HabitProvider(localStorageService)..loadHabits(),
+        
+        // Theo dõi User Context (Đăng nhập)
+        StreamProvider<User?>(
+          create: (_) => authService.authStateChanges,
+          initialData: null,
         ),
-        ChangeNotifierProvider<CalendarProvider>(
-          create: (_) =>
-              CalendarProvider(firestoreService, localStorageService),
+
+        // Habit Provider phụ thuộc vào UserContext thông qua ProxyProvider
+        ChangeNotifierProxyProvider<User?, HabitProvider>(
+          create: (_) => HabitProvider(localStorageService, firestoreService),
+          update: (_, user, habitProvider) => 
+              habitProvider!..updateUser(user?.uid),
+        ),
+
+        // Calendar Provider phụ thuộc vào UserContext và HabitProvider
+        ChangeNotifierProxyProvider2<User?, HabitProvider, CalendarProvider>(
+          create: (_) => CalendarProvider(firestoreService),
+          update: (_, user, habitProvider, calendarProvider) =>
+              calendarProvider!..update(user?.uid, habitProvider.activeHabits),
         ),
       ],
       child: const MyApp(),
