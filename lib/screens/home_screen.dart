@@ -16,7 +16,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   ViewMode _selectedViewMode = ViewMode.day;
   Set<String> _selectedCategories = {};
-  DateTime _selectedDate = DateTime.now();
+  final DateTime _selectedDate = DateTime.now();
 
   // Giả lập dữ liệu hoàn thành (nên lưu trong provider/database)
   final Map<String, bool> _completedHabits = {};
