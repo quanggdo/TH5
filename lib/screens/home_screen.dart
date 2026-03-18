@@ -22,9 +22,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final userId = authService.currentUserId;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Habit tracker - Nhóm 2'),
@@ -135,14 +132,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               habit: habit,
                               isCompleted: isCompleted,
                               onCompleteTap: () {
-                                if (userId != null) {
-                                  calendarProvider.toggleCompletion(
-                                    habit.id,
-                                    userId,
-                                    _selectedDate,
-                                    habit.timesPerDay,
-                                  );
-                                }
+                                calendarProvider.toggleCompletion(
+                                  habit.id,
+                                  _selectedDate,
+                                  habit.timesPerDay,
+                                );
                               },
                             );
                           },

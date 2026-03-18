@@ -68,21 +68,23 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TH5 - Habit Tracker',
-      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
+      // Cấu hình danh sách Menu màn hình (Router)
       routes: {
-        '/login': (_) => const LoginScreen(),
-        '/signup': (_) => const SignupScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/signup': (context) => const SignupScreen(),
+        '/home': (context) => const HomeScreen(),
       },
-      home: StreamBuilder(
-        stream: Provider.of<AuthService>(context, listen: false).authStateChanges,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
+      home: Consumer<User?>(
+        builder: (context, user, child) {
+          // Nếu có user: vào Home, chưa có: mở màn Login
+          if (user != null) {
             return const HomeScreen();
+          } else {
+            return const LoginScreen();
           }
-          return const LoginScreen();
         },
       ),
     );

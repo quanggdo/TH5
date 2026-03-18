@@ -149,7 +149,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 children: [
                   const Text('Đã có tài khoản? ', style: TextStyle(color: Colors.black54)),
                   TextButton(
-                    onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
+                    onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Đăng nhập'),
                   ),
                 ],
