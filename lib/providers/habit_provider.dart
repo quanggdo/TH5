@@ -56,6 +56,19 @@ class HabitProvider extends ChangeNotifier {
         );
       } else {
         _activeHabits = await _localStorageService.getHabits(userId: uid);
+        // Nếu chưa có dữ liệu user, thử migrate từ guest và đẩy lên Firestore
+        if (_activeHabits.isEmpty) {
+          final guestHabits = await _localStorageService.getHabits();
+          if (guestHabits.isNotEmpty) {
+            for (final habit in guestHabits) {
+              habit.userId = uid;
+              await _firestoreService.syncHabit(habit);
+            }
+            _activeHabits = guestHabits;
+            await _localStorageService.saveHabits(_activeHabits, userId: uid);
+            await _localStorageService.clearHabits();
+          }
+        }
       }
     } catch (e) {
       _activeHabits = await _localStorageService.getHabits(userId: uid);
@@ -127,11 +140,35 @@ class HabitProvider extends ChangeNotifier {
     final index = _activeHabits.indexWhere((h) => h.id == habitId);
     if (index != -1) {
       _activeHabits[index].isDeleted = true;
+      // Lưu lại local với flag isDeleted để có thể hoàn tác
       await _localStorageService.saveHabits(_activeHabits, userId: uid);
       try {
+        // Thực hiện xóa vĩnh viễn trên Firestore như yêu cầu
+        await _firestoreService.deleteHabit(uid, habitId);
+      } catch (e) {
+        debugPrint('Delete from Firestore failed: $e');
+      }
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> restoreHabit(String habitId) async {
+    final uid = _effectiveUserId();
+    if (uid == null || uid.trim().isEmpty) {
+      debugPrint('restoreHabit skipped: userId is null');
+      return false;
+    }
+    final index = _activeHabits.indexWhere((h) => h.id == habitId);
+    if (index != -1) {
+      _activeHabits[index].isDeleted = false;
+      await _localStorageService.saveHabits(_activeHabits, userId: uid);
+      try {
+        // Khi hoàn tác, đồng bộ lại habit lên Firestore (sẽ tạo lại document)
         await _firestoreService.syncHabit(_activeHabits[index]);
       } catch (e) {
-        debugPrint('Sync habit failed: $e');
+        debugPrint('Restore to Firestore failed: $e');
       }
       notifyListeners();
       return true;
