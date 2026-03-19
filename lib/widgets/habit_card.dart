@@ -6,6 +6,7 @@ class HabitCard extends StatelessWidget {
   final bool isCompleted;
   final VoidCallback onCompleteTap;
   final VoidCallback? onEditTap;
+  final VoidCallback? onDeleteTap;
 
   const HabitCard({
     super.key,
@@ -13,6 +14,7 @@ class HabitCard extends StatelessWidget {
     required this.isCompleted,
     required this.onCompleteTap,
     this.onEditTap,
+    this.onDeleteTap,
   });
 
   /// Lấy giờ thực hiện (nếu có thêm thông tin từ model)
@@ -103,12 +105,28 @@ class HabitCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (onEditTap != null)
-              IconButton(
-                tooltip: 'Sửa',
-                icon: const Icon(Icons.edit),
-                onPressed: onEditTap,
-              ),
+            // Action Buttons
+            Column(
+              children: [
+                if (onEditTap != null)
+                  IconButton(
+                    tooltip: 'Sửa',
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: onEditTap,
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(8),
+                  ),
+                if (onDeleteTap != null)
+                  IconButton(
+                    tooltip: 'Xóa',
+                    icon: Icon(Icons.delete_outline, 
+                        size: 20, color: colorScheme.error),
+                    onPressed: onDeleteTap,
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(8),
+                  ),
+              ],
+            ),
           ],
         ),
       ),

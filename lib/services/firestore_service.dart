@@ -5,9 +5,10 @@ import '../models/habit_model.dart';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  CollectionReference get _logsCollection => _db.collection('habit_logs');
   CollectionReference _habitsCollectionForUser(String userId) =>
       _db.collection('users').doc(userId).collection('habits');
+  CollectionReference _habitLogsCollectionForUser(String userId) =>
+      _db.collection('users').doc(userId).collection('habit_logs');
 
   // ─── Habits ───────────────────────────────────────────────
 
@@ -19,6 +20,25 @@ class FirestoreService {
           habit.toJson(),
           SetOptions(merge: true),
         );
+  }
+
+  /// Xóa vĩnh viễn Habit khỏi Firestore
+  Future<void> deleteHabit(String userId, String habitId) async {
+    if (userId.trim().isEmpty) return;
+    
+    // Xóa document thói quen
+    await _habitsCollectionForUser(userId).doc(habitId).delete();
+    
+    // Tìm và xóa các logs liên quan đến thói quen này
+    final logsSnapshot = await _habitLogsCollectionForUser(userId)
+        .where('habitId', isEqualTo: habitId)
+        .get();
+        
+    final batch = _db.batch();
+    for (var doc in logsSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
   }
 
   /// Lấy danh sách Habit từ Firestore
@@ -35,8 +55,10 @@ class FirestoreService {
 
   /// Đẩy hoặc cập nhật 1 log lên Firestore
   Future<void> syncLog(HabitLog log) async {
-    final docId = '${log.userId}_${log.habitId}_${log.date}';
-    await _logsCollection.doc(docId).set(
+    final userId = log.userId;
+    if (userId.trim().isEmpty) return;
+    final docId = '${log.habitId}_${log.date}';
+    await _habitLogsCollectionForUser(userId).doc(docId).set(
           log.toFirestore(),
           SetOptions(merge: true),
         );
@@ -48,8 +70,7 @@ class FirestoreService {
   Future<List<HabitLog>> getLogsForDate(String userId, DateTime date) async {
     final dateStr =
         '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    final snapshot = await _logsCollection
-        .where('userId', isEqualTo: userId)
+    final snapshot = await _habitLogsCollectionForUser(userId)
         .where('date', isEqualTo: dateStr)
         .get();
     return snapshot.docs.map((doc) => HabitLog.fromFirestore(doc)).toList();
@@ -66,8 +87,7 @@ class FirestoreService {
     final endStr =
         '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
 
-    final snapshot = await _logsCollection
-        .where('userId', isEqualTo: userId)
+    final snapshot = await _habitLogsCollectionForUser(userId)
         .where('date', isGreaterThanOrEqualTo: startStr)
         .where('date', isLessThanOrEqualTo: endStr)
         .get();
