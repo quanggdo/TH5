@@ -8,6 +8,8 @@ import '../widgets/habit_card.dart';
 import '../widgets/view_mode_selector.dart';
 import '../widgets/habit_filter.dart';
 import 'habit_form_screen.dart';
+import '../services/auth_service.dart';
+import 'change_password_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +26,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: PopupMenuButton<String>(
+          tooltip: 'Tài khoản',
+          icon: const Icon(Icons.person_outline),
+          onSelected: (value) async {
+            if (value == 'change_password') {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen()),
+              );
+            } else if (value == 'logout') {
+              await context.read<AuthService>().signOut();
+              Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(value: 'change_password', child: Text('Đổi mật khẩu')),
+            PopupMenuItem(value: 'logout', child: Text('Đăng xuất')),
+          ],
+        ),
         title: const Text('Theo dõi thói quen'),
         centerTitle: true,
         elevation: 0,
