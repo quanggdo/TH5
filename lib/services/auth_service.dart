@@ -34,4 +34,21 @@ class AuthService {
   Future<void> signOut() async {
     await _auth.signOut();
   }
+
+  /// Email của user hiện tại (nếu có)
+  String? get currentUserEmail => _auth.currentUser?.email;
+
+  /// Thay đổi mật khẩu: cần xác thực lại bằng mật khẩu hiện tại
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw FirebaseAuthException(code: 'no-user', message: 'Không có tài khoản đang đăng nhập');
+    }
+
+    final cred = EmailAuthProvider.credential(email: user.email!, password: currentPassword);
+    // Reauthenticate
+    await user.reauthenticateWithCredential(cred);
+    // Update password
+    await user.updatePassword(newPassword);
+  }
 }
