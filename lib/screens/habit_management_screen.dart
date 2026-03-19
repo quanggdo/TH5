@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/habit_model.dart';
@@ -136,64 +137,100 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
                   final badgeText = _badgeLabel(item.badgeType);
                   final badgeColor = _badgeColor(item.badgeType);
 
-                  return ListTile(
-                    title: Text(
-                      habit.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  return Dismissible(
+                    key: ValueKey(habit.id),
+                    direction: DismissDirection.endToStart,
+                    dismissThresholds: const {
+                      DismissDirection.endToStart: 0.25,
+                    },
+                    confirmDismiss: (_) => _confirmDelete(context, habit),
+                    background: const SizedBox.shrink(),
+                    secondaryBackground: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.delete,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _subtitleForHabit(habit),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Tiến độ hôm nay: ${item.progressToday}/${habit.timesPerDay}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        if (item.badgeType == _DueBadgeType.tomorrow &&
-                            item.nextDueDate != null)
+                    onDismissed: (_) => _handleDelete(context, habit),
+                    child: ListTile(
+                      title: Text(
+                        habit.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            'Lần tiếp theo: ${_formatDate(item.nextDueDate!)}',
+                            _subtitleForHabit(habit),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Tiến độ hôm nay: ${item.progressToday}/${habit.timesPerDay}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (badgeText != null)
-                          Chip(
-                            label: Text(badgeText),
-                            backgroundColor: badgeColor,
-                            visualDensity: VisualDensity.compact,
+                          if (item.badgeType == _DueBadgeType.tomorrow &&
+                              item.nextDueDate != null)
+                            Text(
+                              'Lần tiếp theo: ${_formatDate(item.nextDueDate!)}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (badgeText != null)
+                            Chip(
+                              label: Text(badgeText),
+                              backgroundColor: badgeColor,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          IconButton(
+                            tooltip: 'Xóa thói quen',
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () async {
+                              final approved = await _confirmDelete(context, habit);
+                              if (approved && context.mounted) {
+                                await _handleDelete(context, habit);
+                              }
+                            },
                           ),
-                        PopupMenuButton<String>(
-                          onSelected: (value) {
-                            if (value == 'edit') {
-                              _openEdit(context, habit);
-                            } else if (value == 'delete') {
-                              _confirmDelete(context, habit);
-                            }
-                          },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Sửa'),
-                            ),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Xóa'),
-                            ),
-                          ],
-                        ),
-                      ],
+                          PopupMenuButton<String>(
+                            onSelected: (value) async {
+                              if (value == 'edit') {
+                                _openEdit(context, habit);
+                              } else if (value == 'delete') {
+                                final approved = await _confirmDelete(context, habit);
+                                if (approved && context.mounted) {
+                                  await _handleDelete(context, habit);
+                                }
+                              }
+                            },
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Text('Sửa'),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Xóa'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      isThreeLine: true,
                     ),
-                    isThreeLine: true,
                   );
                 },
                 separatorBuilder: (_, _) => const Divider(height: 1),
@@ -222,7 +259,7 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, Habit habit) async {
+  Future<bool> _confirmDelete(BuildContext context, Habit habit) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -241,9 +278,25 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
       ),
     );
 
-    if (shouldDelete == true && context.mounted) {
-      await context.read<HabitProvider>().deleteHabit(habit.id);
-    }
+    return shouldDelete == true;
+  }
+
+  Future<void> _handleDelete(BuildContext context, Habit habit) async {
+    final success = await context.read<HabitProvider>().deleteHabit(habit.id);
+    if (!success || !context.mounted) return;
+
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Đã xóa "${habit.title}"'),
+        action: SnackBarAction(
+          label: 'Hoàn tác',
+          onPressed: () {
+            context.read<HabitProvider>().restoreHabit(habit.id);
+          },
+        ),
+      ),
+    );
   }
 
   void _sortByTodayPriority(List<_HabitListItemData> items) {

@@ -43,4 +43,10 @@ class LocalStorageService {
       await saveHabits(habits, userId: userId);
     }
   }
+
+  /// Xóa danh sách thói quen đã lưu trong SharedPreferences
+  Future<void> clearHabits({String? userId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyForUser(userId));
+  }
 }

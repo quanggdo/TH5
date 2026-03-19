@@ -265,6 +265,11 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     if (!form.validate()) return;
 
     if (_type == HabitType.weekly && _weeklyDays.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng chọn ít nhất 1 ngày trong tuần')),
+        );
+      }
       setState(() {});
       return;
     }
@@ -292,20 +297,40 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
       isDeleted: existing?.isDeleted ?? false,
     );
 
-    if (existing == null) {
-      await habitProvider.addHabit(habit);
-    } else {
-      await habitProvider.updateHabit(habit);
-    }
+    try {
+      final success = existing == null
+          ? await habitProvider.addHabit(habit)
+          : await habitProvider.updateHabit(habit);
 
-    if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      if (!success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Chưa đăng nhập. Vui lòng đăng nhập để lưu thói quen.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lưu thất bại: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   String _generateId() {
     final millis = DateTime.now().millisecondsSinceEpoch;
-    final rand = Random().nextInt(1 << 32);
+    // Use a safe max for web/JS integer range with Random.nextInt.
+    final rand = Random().nextInt(1 << 31);
     return '${millis}_$rand';
   }
 
