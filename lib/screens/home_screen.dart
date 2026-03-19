@@ -193,6 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     );
                                   },
+                                  onDeleteTap: () => _showDeleteConfirmation(context, habit),
                                 );
                               },
                             ),
@@ -222,5 +223,43 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const HabitFormScreen(),
       ),
     );
+  }
+
+  Future<void> _showDeleteConfirmation(BuildContext context, Habit habit) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận xóa'),
+        content: Text('Bạn có chắc chắn muốn xóa thói quen "${habit.title}" không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final success = await context.read<HabitProvider>().deleteHabit(habit.id);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã xóa "${habit.title}"'),
+            action: SnackBarAction(
+              label: 'Hoàn tác',
+              onPressed: () {
+                context.read<HabitProvider>().restoreHabit(habit.id);
+              },
+            ),
+          ),
+        );
+      }
+    }
   }
 }
