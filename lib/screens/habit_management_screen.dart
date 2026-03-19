@@ -53,6 +53,7 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: BackButton(onPressed: () => Navigator.of(context).pop()),
         title: const Text('Thói quen đang thực hiện'),
         actions: [
           IconButton(
