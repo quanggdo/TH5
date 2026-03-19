@@ -33,7 +33,6 @@ class _HabitFilterState extends State<HabitFilter> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // "Tất cả" checkbox
             CheckboxListTile(
               title: const Text('Tất cả'),
               value: _selectedCategories.length == widget.categories.length,
@@ -48,10 +47,9 @@ class _HabitFilterState extends State<HabitFilter> {
               },
             ),
             const Divider(),
-            // Category checkboxes
             ...widget.categories.map(
               (category) => CheckboxListTile(
-                title: Text(category.isEmpty ? 'Không có loại' : category),
+                title: Text(category.isEmpty ? 'Không có nhóm' : category),
                 value: _selectedCategories.contains(category),
                 onChanged: (value) {
                   setState(() {
@@ -72,7 +70,7 @@ class _HabitFilterState extends State<HabitFilter> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Hủy'),
         ),
-        ElevatedButton(
+        FilledButton(
           onPressed: () {
             widget.onFilterChanged(_selectedCategories);
             Navigator.pop(context);

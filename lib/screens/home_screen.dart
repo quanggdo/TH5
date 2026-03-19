@@ -7,6 +7,7 @@ import 'habit_management_screen.dart';
 import '../widgets/habit_card.dart';
 import '../widgets/view_mode_selector.dart';
 import '../widgets/habit_filter.dart';
+import 'habit_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,27 +19,31 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   ViewMode _selectedViewMode = ViewMode.day;
   Set<String> _selectedCategories = {};
-  final DateTime _selectedDate = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Habit tracker - Nhóm 2'),
+        title: const Text('Theo dõi thói quen'),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Thêm thói quen',
+            icon: const Icon(Icons.add),
+            onPressed: () => _openCreate(context),
+          ),
+        ],
       ),
       body: Consumer<CalendarProvider>(
         builder: (context, calendarProvider, _) => Consumer<HabitProvider>(
           builder: (context, habitProvider, _) {
-            // Lấy danh sách thói quen cho ngày đã chọn từ CalendarProvider,
-            // và đảm bảo chỉ dùng những habit còn tồn tại trong HabitProvider
+            final selectedDate = calendarProvider.selectedDate;
             final List<Habit> calendarHabits = calendarProvider.habitsForToday;
             List<Habit> habitList = calendarHabits
                 .where((h) => habitProvider.getHabitById(h.id) != null)
                 .toList();
 
-            // Áp dụng filter theo category
             if (_selectedCategories.isNotEmpty) {
               habitList = habitList
                   .where((h) => _selectedCategories.contains(h.category))
@@ -49,17 +54,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
             return Column(
               children: [
-                // View Mode Selector
                 ViewModeSelector(
                   selectedMode: _selectedViewMode,
-                  onModeChanged: (mode) {
+                  onModeChanged: (mode) async {
                     setState(() {
                       _selectedViewMode = mode;
                     });
+
+                    final calendarView = _mapViewMode(mode);
+                    await calendarProvider.changeView(calendarView);
                   },
                 ),
                 const Divider(),
-                // Filter Button
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16.0,
@@ -68,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton.icon(
+                        child: FilledButton.tonalIcon(
                           onPressed: () {
                             showDialog(
                               context: context,
@@ -89,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: ElevatedButton.icon(
+                        child: FilledButton.tonalIcon(
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
@@ -105,46 +111,95 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const Divider(),
-                // Habits List
                 Expanded(
                   child: (habitProvider.isLoading || calendarProvider.isLoading)
                       ? const Center(child: CircularProgressIndicator())
                       : habitList.isEmpty
-                      ? Center(
-                          child: Text(
-                            _selectedCategories.isEmpty
-                                ? 'Không có thói quen nào'
-                                : 'Không có thói quen nào trong filter đã chọn',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: habitList.length,
-                          itemBuilder: (context, index) {
-                            final habit = habitList[index];
-                            final isCompleted =
-                                (calendarProvider.completionCount[habit.id] ??
-                                    0) >=
-                                habit.timesPerDay;
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.auto_awesome, size: 56),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      _selectedCategories.isEmpty
+                                          ? 'Chưa có thói quen nào hôm nay'
+                                          : 'Không có thói quen nào theo bộ lọc',
+                                      style: Theme.of(context).textTheme.bodyMedium,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    FilledButton.icon(
+                                      onPressed: () => _openCreate(context),
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Tạo thói quen mới'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: habitList.length,
+                              itemBuilder: (context, index) {
+                                final habit = habitList[index];
+                                final isCompleted =
+                                    (calendarProvider.completionCount[habit.id] ??
+                                            0) >=
+                                        habit.timesPerDay;
 
-                            return HabitCard(
-                              habit: habit,
-                              isCompleted: isCompleted,
-                              onCompleteTap: () {
-                                calendarProvider.toggleCompletion(
-                                  habit.id,
-                                  _selectedDate,
-                                  habit.timesPerDay,
+                                return HabitCard(
+                                  habit: habit,
+                                  isCompleted: isCompleted,
+                                  onCompleteTap: () async {
+                                    final newCount =
+                                        await calendarProvider.toggleCompletion(
+                                      habit.id,
+                                      selectedDate,
+                                      habit.timesPerDay,
+                                    );
+                                    if (newCount >= habit.timesPerDay) {
+                                      await context
+                                          .read<HabitProvider>()
+                                          .markCompleted(habit.id);
+                                    }
+                                  },
+                                  onEditTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            HabitFormScreen(existingHabit: habit),
+                                      ),
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                        ),
+                            ),
                 ),
               ],
             );
           },
         ),
+      ),
+    );
+  }
+
+  CalendarView _mapViewMode(ViewMode mode) {
+    switch (mode) {
+      case ViewMode.day:
+        return CalendarView.day;
+      case ViewMode.week:
+        return CalendarView.week;
+      case ViewMode.month:
+        return CalendarView.month;
+    }
+  }
+
+  void _openCreate(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const HabitFormScreen(),
       ),
     );
   }

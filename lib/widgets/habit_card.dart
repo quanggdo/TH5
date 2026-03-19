@@ -5,12 +5,14 @@ class HabitCard extends StatelessWidget {
   final Habit habit;
   final bool isCompleted;
   final VoidCallback onCompleteTap;
+  final VoidCallback? onEditTap;
 
   const HabitCard({
     super.key,
     required this.habit,
     required this.isCompleted,
     required this.onCompleteTap,
+    this.onEditTap,
   });
 
   /// Lấy giờ thực hiện (nếu có thêm thông tin từ model)
@@ -25,7 +27,7 @@ class HabitCard extends StatelessWidget {
   /// Chuyển enum HabitType sang chuỗi hiển thị
   String get _habitTypeText {
     if (habit.type == HabitType.weekly) {
-      return 'Hàng tuần';
+      return 'Theo tuần';
     } else if (habit.type == HabitType.interval) {
       return 'Cách ${habit.intervalDays} ngày';
     }
@@ -34,13 +36,15 @@ class HabitCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      elevation: 2,
+      elevation: 1,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          color: colorScheme.surface,
         ),
         padding: const EdgeInsets.all(12.0),
         child: Row(
@@ -61,9 +65,10 @@ class HabitCard extends StatelessWidget {
                   // Thời gian thực hiện
                   Text(
                     _executionTime,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: Colors.grey[600]),
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 4),
                   // Tiêu đề (bold, 1 dòng, truncate với ...)
@@ -72,8 +77,8 @@ class HabitCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 4),
                   // Chi tiết (nhạt hơn, 3 dòng, truncate với ...)
@@ -81,21 +86,29 @@ class HabitCard extends StatelessWidget {
                     habit.detail,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 6),
                   // Loại thói quen
                   Text(
                     _habitTypeText,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: Colors.blueAccent),
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: colorScheme.primary),
                   ),
                 ],
               ),
             ),
+            if (onEditTap != null)
+              IconButton(
+                tooltip: 'Sửa',
+                icon: const Icon(Icons.edit),
+                onPressed: onEditTap,
+              ),
           ],
         ),
       ),
