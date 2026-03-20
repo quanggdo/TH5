@@ -31,20 +31,33 @@ class _HabitListItemData {
 }
 
 class _HabitManagementScreenState extends State<HabitManagementScreen> {
-  bool _syncedCalendarToToday = false;
+  bool _didInitialLoad = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_syncedCalendarToToday) return;
+    if (_didInitialLoad) return;
+    _didInitialLoad = true;
 
-    _syncedCalendarToToday = true;
+    // Đảm bảo CalendarProvider trỏ đúng ngày hôm nay và load completion status
     final today = _dateOnly(DateTime.now());
     final calendarProvider = context.read<CalendarProvider>();
 
     if (!_isSameDay(calendarProvider.selectedDate, today)) {
-      Future.microtask(() => calendarProvider.selectDate(today));
+      // Dùng addPostFrameCallback thay vì microtask để tránh rebuild trong build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          calendarProvider.selectDate(today);
+        }
+      });
     }
+
+    // Trigger refresh habit list từ API
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<HabitProvider>().refreshHabits();
+      }
+    });
   }
 
   @override
@@ -70,6 +83,10 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
       ),
       body: Consumer2<HabitProvider, CalendarProvider>(
         builder: (context, habitProvider, calendarProvider, _) {
+          if (habitProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
           final items = habitProvider.activeHabits.map((habit) {
             final progressToday =
                 calendarProvider.completionCount[habit.id] ?? 0;
@@ -161,6 +178,7 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
                     ),
                     onDismissed: (_) => _handleDelete(context, habit),
                     child: ListTile(
+                      onTap: () => _openEdit(context, habit),
                       title: Text(
                         habit.title,
                         maxLines: 1,
@@ -175,15 +193,44 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            'Tiến độ hôm nay: ${item.progressToday}/${habit.timesPerDay}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                          // Hiển thị tiến độ hoàn thành
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: (item.progressToday / habit.timesPerDay)
+                                        .clamp(0.0, 1.0),
+                                    minHeight: 5,
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerHighest,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      item.progressToday >= habit.timesPerDay
+                                          ? Colors.green
+                                          : Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${item.progressToday}/${habit.timesPerDay}',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                            ],
                           ),
                           if (item.badgeType == _DueBadgeType.tomorrow &&
                               item.nextDueDate != null)
-                            Text(
-                              'Lần tiếp theo: ${_formatDate(item.nextDueDate!)}',
-                              style: Theme.of(context).textTheme.bodySmall,
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Lần tiếp theo: ${_formatDate(item.nextDueDate!)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                             ),
                         ],
                       ),
@@ -196,16 +243,6 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
                               backgroundColor: badgeColor,
                               visualDensity: VisualDensity.compact,
                             ),
-                          IconButton(
-                            tooltip: 'Xóa thói quen',
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () async {
-                              final approved = await _confirmDelete(context, habit);
-                              if (approved && context.mounted) {
-                                await _handleDelete(context, habit);
-                              }
-                            },
-                          ),
                           PopupMenuButton<String>(
                             onSelected: (value) async {
                               if (value == 'edit') {
@@ -234,7 +271,7 @@ class _HabitManagementScreenState extends State<HabitManagementScreen> {
                     ),
                   );
                 },
-                separatorBuilder: (_, _) => const Divider(height: 1),
+                separatorBuilder: (_, __) => const Divider(height: 1),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 84)),
             ],

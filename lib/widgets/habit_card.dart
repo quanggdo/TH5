@@ -4,6 +4,7 @@ import '../models/habit_model.dart';
 class HabitCard extends StatelessWidget {
   final Habit habit;
   final bool isCompleted;
+  final int completionCount;
   final VoidCallback onCompleteTap;
   final VoidCallback? onEditTap;
   final VoidCallback? onDeleteTap;
@@ -12,6 +13,7 @@ class HabitCard extends StatelessWidget {
     super.key,
     required this.habit,
     required this.isCompleted,
+    this.completionCount = 0,
     required this.onCompleteTap,
     this.onEditTap,
     this.onDeleteTap,
@@ -39,6 +41,7 @@ class HabitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final progress = completionCount / habit.timesPerDay;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -59,7 +62,7 @@ class HabitCard extends StatelessWidget {
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             const SizedBox(width: 12),
-            // Content (Title, Details, Type)
+            // Content (Title, Details, Type, Progress)
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,6 +104,39 @@ class HabitCard extends StatelessWidget {
                         .textTheme
                         .labelSmall
                         ?.copyWith(color: colorScheme.primary),
+                  ),
+                  const SizedBox(height: 8),
+                  // ── Completion progress ──────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progress.clamp(0.0, 1.0),
+                            minHeight: 6,
+                            backgroundColor:
+                                colorScheme.surfaceContainerHighest,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isCompleted
+                                  ? Colors.green
+                                  : colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$completionCount/${habit.timesPerDay}',
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: isCompleted
+                                      ? Colors.green
+                                      : colorScheme.onSurface,
+                                ),
+                      ),
+                    ],
                   ),
                 ],
               ),
