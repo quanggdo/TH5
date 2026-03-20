@@ -79,6 +79,11 @@ class HabitProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Public method to re-fetch habits from API (used by screens that need fresh data)
+  Future<void> refreshHabits() async {
+    await _syncAndLoadHabits();
+  }
+
   Future<void> loadHabits() async {
     final uid = _effectiveUserId();
     _activeHabits = await _localStorageService.getHabits(userId: uid);

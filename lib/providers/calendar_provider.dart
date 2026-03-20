@@ -78,7 +78,11 @@ class CalendarProvider extends ChangeNotifier {
   Future<void> changeView(CalendarView view) async {
     _currentView = view;
     if (_userId != null) {
-      await _loadLogsForView();
+      if (view == CalendarView.day) {
+        await _loadCompletionStatus();
+      } else {
+        await _loadLogsForView();
+      }
     }
     notifyListeners();
   }

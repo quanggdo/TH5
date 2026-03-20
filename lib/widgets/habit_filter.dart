@@ -17,12 +17,14 @@ class HabitFilter extends StatefulWidget {
 }
 
 class _HabitFilterState extends State<HabitFilter> {
-  late Set<String> _selectedCategories;
+  String? _selectedCategory;
 
   @override
   void initState() {
     super.initState();
-    _selectedCategories = Set.from(widget.selectedCategories);
+    _selectedCategory = widget.selectedCategories.isEmpty
+        ? null
+        : _normalize(widget.selectedCategories.first);
   }
 
   @override
@@ -35,28 +37,23 @@ class _HabitFilterState extends State<HabitFilter> {
           children: [
             CheckboxListTile(
               title: const Text('Tất cả'),
-              value: _selectedCategories.length == widget.categories.length,
+              value: _selectedCategory == null,
               onChanged: (value) {
-                setState(() {
-                  if (value == true) {
-                    _selectedCategories = Set.from(widget.categories);
-                  } else {
-                    _selectedCategories.clear();
-                  }
-                });
+                if (value != true) return;
+                setState(() => _selectedCategory = null);
               },
             ),
             const Divider(),
             ...widget.categories.map(
               (category) => CheckboxListTile(
                 title: Text(category.isEmpty ? 'Không có nhóm' : category),
-                value: _selectedCategories.contains(category),
+                value: _selectedCategory == _normalize(category),
                 onChanged: (value) {
                   setState(() {
                     if (value == true) {
-                      _selectedCategories.add(category);
+                      _selectedCategory = _normalize(category);
                     } else {
-                      _selectedCategories.remove(category);
+                      _selectedCategory = null;
                     }
                   });
                 },
@@ -72,7 +69,11 @@ class _HabitFilterState extends State<HabitFilter> {
         ),
         FilledButton(
           onPressed: () {
-            widget.onFilterChanged(_selectedCategories);
+            if (_selectedCategory == null) {
+              widget.onFilterChanged(<String>{});
+            } else {
+              widget.onFilterChanged({_selectedCategory!});
+            }
             Navigator.pop(context);
           },
           child: const Text('Áp dụng'),
@@ -80,4 +81,6 @@ class _HabitFilterState extends State<HabitFilter> {
       ],
     );
   }
+
+  String _normalize(String? value) => (value ?? '').trim().toLowerCase();
 }
